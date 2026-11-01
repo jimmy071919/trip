@@ -126,3 +126,35 @@ def test_endpoint(api, anon):
     assert r.status_code == 422 and "url" in r.json()["error"]["fields"]
     api.post("/auth/logout")
     assert api.post("/places/resolve-google-link", {"url": PLACE_URL}).status_code == 401
+
+
+def test_nominatim_fallback_for_links_without_coords(monkeypatch):
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(req)
+        assert req.url.host == "nominatim.openstreetmap.org"
+        assert "MapTripPlanner" in req.headers["User-Agent"]
+        return httpx.Response(200, json=[{"lat": "25.0339", "lon": "121.5645"}])
+
+    p = gmaps.resolve("https://maps.google.com/maps?q=台北101,+信義區信義路五段7號&ftid=0x1:0x2", client=_client(handler))
+    assert (p.latitude, p.longitude) == (25.0339, 121.5645)
+    assert p.source == "nominatim" and not p.precise
+    assert seen[0].url.params["q"].startswith("台北101")  # full address tried first
+
+
+def test_nominatim_no_result_and_disabled(monkeypatch):
+    p = gmaps.resolve("https://maps.google.com/maps?q=某個不存在的地方", client=_client(lambda r: httpx.Response(200, json=[])))
+    assert p.latitude is None and any("點選" in w for w in p.warnings)
+
+    monkeypatch.setenv("ENABLE_NOMINATIM", "false")
+    get_settings.cache_clear()
+    try:
+        def boom(req):
+            raise AssertionError("should not be called")
+
+        p = gmaps.resolve("https://maps.google.com/maps?q=台北101", client=_client(boom))
+        assert p.latitude is None
+    finally:
+        monkeypatch.delenv("ENABLE_NOMINATIM")
+        get_settings.cache_clear()

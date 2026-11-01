@@ -24,23 +24,41 @@ export default function GoogleLinkImport({ placesEnabled, onDone }: { placesEnab
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const startDraftFromPlace = useStore((s) => s.startDraftFromPlace);
+  const [notice, setNotice] = useState<string | null>(null);
+  const { startDraftFromPlace, save, select, upsertStop } = useStore.getState();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    const project = useStore.getState().project;
+    if (!url.trim() || !project) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const place = await api.resolveGoogleLink(url);
-      const notice = [
-        place.source === "google_places" ? "已從 Google 地圖帶入地點資訊，請確認後儲存。" : "已從連結帶入名稱與位置，請確認後儲存。",
-        ...place.warnings,
-      ].join(" ");
-      startDraftFromPlace(placeToPrefill(place), notice);
-      if (place.latitude != null && place.longitude != null) {
-        mapHandle.current?.setView([place.latitude, place.longitude], Math.max(mapHandle.current.getZoom(), 16));
+      const prefill = placeToPrefill(place);
+      if (place.latitude == null || place.longitude == null) {
+        // nothing could locate it: let the user click the map, form stays pre-filled
+        startDraftFromPlace(prefill, place.warnings.join(" "));
+        onDone?.();
+        setUrl("");
+        return;
       }
+      const filter = useStore.getState().dayFilter;
+      const dayId = filter !== "all" && filter !== "unscheduled" ? filter : null;
+      const created = await save(
+        () =>
+          api.createStop(project.id, {
+            ...prefill,
+            title: (prefill.title || place.address || "Google 地圖地點").slice(0, 200),
+            day_id: dayId,
+          }),
+        { refresh: true },
+      );
+      upsertStop(created);
+      select({ kind: "stop", id: created.id });
+      mapHandle.current?.setView([created.latitude, created.longitude], Math.max(mapHandle.current.getZoom(), 16));
+      setNotice([`已新增「${created.title}」`, ...place.warnings].join("。"));
       setUrl("");
       onDone?.();
     } catch (err) {
@@ -69,12 +87,13 @@ export default function GoogleLinkImport({ placesEnabled, onDone }: { placesEnab
           }}
         />
         <button className="btn-secondary shrink-0" type="submit" disabled={busy || !url.trim()}>
-          {busy ? "解析中…" : "定位"}
+          {busy ? "新增中…" : "新增"}
         </button>
       </div>
       {error && <p className="field-error">{error}</p>}
-      {!placesEnabled && (
-        <p className="mt-1 text-[11px] leading-snug text-slate-400">只會帶入名稱與座標；設定 GOOGLE_MAPS_API_KEY 後可一併帶入地址、電話、營業時間。</p>
+      {notice && <p className="mt-1 text-xs text-green-700" data-testid="gmaps-notice">{notice}</p>}
+      {!placesEnabled && !notice && (
+        <p className="mt-1 text-[11px] leading-snug text-slate-400">會帶入名稱與座標；設定 GOOGLE_MAPS_API_KEY 後可一併帶入地址、電話、營業時間。</p>
       )}
     </form>
   );

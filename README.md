@@ -99,7 +99,8 @@ JSON 匯出只包含單一專案，**不等於** 系統全量備份，請搭配 
 | `TILE_URL` / `TILE_ATTRIBUTION` / `TILE_MAX_ZOOM` | OSM | 地圖底圖來源與版權標示 |
 | `ENABLE_DOCS` | `true` | 是否開放 `/api/v1/docs`（OpenAPI） |
 | `GOOGLE_MAPS_API_KEY` | 空 | 選填。Google Places API (New) 金鑰，用於從 Google 地圖連結帶入地址／電話／網站／營業時間 |
-| `GOOGLE_PLACES_LANGUAGE` | `zh-TW` | Places 回傳資料的語言 |
+| `GOOGLE_PLACES_LANGUAGE` | `zh-TW` | Places／Nominatim 回傳資料的語言 |
+| `ENABLE_NOMINATIM` / `NOMINATIM_URL` / `NOMINATIM_EMAIL` | `true` / OSM 公共服務 / 空 | 沒有座標的 Google 連結以地址自動定位（可改自架或關閉） |
 
 ### 地圖底圖
 
@@ -123,7 +124,7 @@ TILE_ATTRIBUTION='&copy; Example Maps &copy; <a href="https://www.openstreetmap.
 | 操作 | 方法 |
 | --- | --- |
 | 新增地點 | 「＋ 新增地點」→ 點地圖 → 填名稱 → 儲存（取消則移除暫存標記；Esc 可離開新增模式） |
-| 從 Google 地圖新增 | 在 Google 地圖 App／網頁開啟地點 →「分享」→ 複製連結 → 貼到左側「從 Google 地圖連結新增」→ 地圖自動定位並帶入資料，確認後儲存 |
+| 從 Google 地圖新增 | 在 Google 地圖 App／網頁開啟地點 →「分享」→ 複製連結 → 貼到左側「從 Google 地圖連結新增」→ 自動建立地點並定位（加入頂部篩選中的日期，否則為未排程） |
 | 修正位置 | 直接拖曳地圖標記（放開即儲存），或在詳情面板輸入經緯度 |
 | 加入日期 | 新增地點時選擇日期，或在地點詳情改「日期」；頂部日期篩選選定某天時，新地點預設加入該天 |
 | 排序 | 左側清單用 ⋮⋮ 把手拖曳（同一天內） |
@@ -142,10 +143,12 @@ TILE_ATTRIBUTION='&copy; Example Maps &copy; <a href="https://www.openstreetmap.
 | 未設定 API 金鑰 | 已設定 `GOOGLE_MAPS_API_KEY` |
 | --- | --- |
 | 從網址解析 **名稱、座標**，原始連結存入「參考網址」 | 另外以 Places API 帶入 **地址、電話、網站、評分、營業時間**（寫入地址與備註欄） |
-| 連結沒有座標時（部分手機分享連結只有名稱＋地址），帶入名稱與地址，再請你在地圖上點選位置 | 沒有座標的連結也能自動定位 |
+| 連結沒有座標時（部分手機分享連結只有名稱＋地址），以地址透過 OpenStreetMap Nominatim 推算位置 | 先用 Places API 定位，找不到再用 Nominatim |
 
 - 系統只解析網址，不下載或擷取 Google 地圖網頁內容。短網址展開時只跟隨導向 Google 網域的轉址。
-- 若座標只能取自連結中的「地圖中心」（`@…` 而非地點標記），表單會提示座標可能略有偏差。
+- 貼上後直接建立地點並選取，可立即在右側修改；若座標是推算或取自「地圖中心」（`@…` 而非地點標記），會提示確認位置（拖曳標記即可修正）。
+- 只有在所有方式都無法定位時，才會改為請你在地圖上點選位置（表單已預填）。
+- Nominatim 公共服務限制每秒 1 次查詢，後端已自動節流；大量使用請自架或關閉（`ENABLE_NOMINATIM=false`）。使用時地點名稱／地址會傳給 OpenStreetMap。
 - 取得 API 金鑰：Google Cloud Console → 啟用「Places API (New)」→ 建立 API 金鑰（建議限制只能呼叫 Places API）。每次解析呼叫一次 Text Search，依 Google 計價收費；金鑰只存在伺服器端，不會傳到瀏覽器。
 - 使用此功能時，連結（及地點名稱）會由伺服器傳給 Google；行程筆記不會傳出。
 

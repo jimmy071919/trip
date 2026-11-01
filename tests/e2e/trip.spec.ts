@@ -115,17 +115,18 @@ test("plan a day, record transport, drag, persist, and recover from failures", a
   await expect(page.getByRole("button", { name: /步行/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /未設定交通方式/ })).toHaveCount(2);
 
-  // Google Maps link → pre-filled draft at the pin location (parsed from the URL, no network needed)
+  // Google Maps link → stop is created and placed automatically (coordinates parsed from the URL)
   const link =
     "https://www.google.com/maps/place/%E6%B7%BA%E8%8D%89%E5%AF%BA/@35.7147651,139.7940837,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d35.7147651!4d139.7966586";
   await page.getByLabel("從 Google 地圖連結新增").fill(link);
-  await page.getByRole("button", { name: "定位" }).click();
-  await expect(page.getByRole("heading", { name: "新增地點" })).toBeVisible();
-  await expect(page.getByLabel("名稱 *")).toHaveValue("淺草寺");
+  await page.getByRole("button", { name: "新增", exact: true }).click();
+  await expect(page.getByTestId("gmaps-notice")).toContainText("已新增「淺草寺」");
+  await expect(page.getByTestId("stop-item").filter({ hasText: "淺草寺" })).toBeVisible();
+  await expect(page.locator('.leaflet-marker-icon[title="淺草寺"]')).toBeVisible();
+  await expect(page.getByRole("heading", { name: "地點詳情" })).toBeVisible();
   await expect(page.getByLabel("緯度 *")).toHaveValue("35.714765");
   await expect(page.getByLabel("參考網址")).toHaveValue(link);
-  await page.getByRole("button", { name: "儲存", exact: true }).click();
-  await expect(page.getByTestId("stop-item").filter({ hasText: "淺草寺" })).toBeVisible();
+  await saved(page);
   await page.getByTestId("stop-item").filter({ hasText: "飯店" }).getByRole("button", { name: "飯店", exact: true }).click();
 
   // AC-09: API unreachable → 儲存失敗 + retry, never 已儲存

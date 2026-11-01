@@ -102,6 +102,6 @@ export interface ResolvedPlace {
   opening_hours: string[];
   rating: number | null;
   google_maps_url: string | null;
-  source: "url" | "google_places";
+  source: "url" | "google_places" | "nominatim";
   warnings: string[];
 }

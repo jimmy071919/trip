@@ -309,4 +309,4 @@ Definition of Done：P0 需求與驗收條件全部通過；`docker compose up -
 | 匯入 | 一律建立新專案並重新產生 UUID；驗證失敗不會留下部分資料。 |
 | 觸控拖曳 | 觸控裝置上標記需先選取才能拖曳，避免與地圖平移衝突；清單排序使用專用把手。 |
 | 跨日拖曳 | 清單中僅支援同日排序；跨日移動透過地點詳情的「日期」欄位（STOP-04）。 |
-| Google 地圖連結（新增） | `POST /places/resolve-google-link`：解析分享連結取得名稱與座標（短網址只跟隨 Google 網域轉址）；設定 `GOOGLE_MAPS_API_KEY` 時以 Places API (New) Text Search 補充地址、電話、網站、營業時間。前端以預填的暫存標記呈現，使用者確認後才儲存。屬 MAP-09 的部分提前實作。 |
+| Google 地圖連結（新增） | `POST /places/resolve-google-link`：解析分享連結取得名稱與座標（短網址只跟隨 Google 網域轉址）；設定 `GOOGLE_MAPS_API_KEY` 時以 Places API (New) Text Search 補充地址、電話、網站、營業時間。連結無座標時以 Nominatim 依地址推算（節流 1 次／秒）。前端貼上後直接建立地點（加入目前篩選的日期）並選取，僅在完全無法定位時才請使用者點地圖。屬 MAP-09 的部分提前實作。 |

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import math
 import re
+import threading
+import time
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, unquote_plus, urlparse
 
@@ -232,6 +234,47 @@ def enrich_with_places(p: Place, client: httpx.Client, api_key: str, language: s
     p.source = "google_places"
 
 
+_nominatim_lock = threading.Lock()
+_nominatim_last = 0.0
+
+
+def geocode_nominatim(p: Place, client: httpx.Client) -> None:
+    """Locate a place from its address / name via Nominatim (max 1 req/s)."""
+    global _nominatim_last
+    s = get_settings()
+    candidates = [q for q in (p.address, p.name) if q]
+    for q in dict.fromkeys(candidates):
+        with _nominatim_lock:
+            wait = 1.0 - (time.monotonic() - _nominatim_last)
+            if wait > 0:
+                time.sleep(wait)
+            params = {"q": q, "format": "jsonv2", "limit": 1, "accept-language": s.google_places_language}
+            if s.nominatim_email:
+                params["email"] = s.nominatim_email
+            try:
+                r = client.get(
+                    s.nominatim_url.rstrip("/") + "/search",
+                    params=params,
+                    headers={"User-Agent": "MapTripPlanner/1.0 (self-hosted trip planner)"},
+                )
+            except httpx.HTTPError:
+                p.warnings.append("地址定位服務無法連線")
+                return
+            finally:
+                _nominatim_last = time.monotonic()
+        if r.status_code != 200:
+            p.warnings.append(f"地址定位服務錯誤（HTTP {r.status_code}）")
+            return
+        results = r.json() or []
+        if results:
+            lat, lng = float(results[0]["lat"]), float(results[0]["lon"])
+            if _valid(lat, lng):
+                p.latitude, p.longitude, p.precise = lat, lng, False
+                p.source = "nominatim" if p.source == "url" else p.source
+                p.warnings.append("連結中沒有座標，位置由地址推算（OpenStreetMap），請確認標記位置")
+                return
+
+
 def resolve(raw_url: str, client: httpx.Client | None = None) -> Place:
     settings = get_settings()
     own = client is None
@@ -250,9 +293,11 @@ def resolve(raw_url: str, client: httpx.Client | None = None) -> Place:
             place.google_maps_url = raw_url.strip() if len(raw_url.strip()) < 1900 else None
         if settings.google_maps_api_key:
             enrich_with_places(place, client, settings.google_maps_api_key, settings.google_places_language)
+        if place.latitude is None and settings.enable_nominatim:
+            geocode_nominatim(place, client)
         if place.latitude is None:
-            place.warnings.append("連結中沒有座標，請在地圖上點選地點位置")
-        elif not place.precise:
+            place.warnings.append("無法取得座標，請在地圖上點選地點位置")
+        elif not place.precise and place.source != "nominatim":
             place.warnings.append("座標為連結中的地圖中心，可能與實際地點略有差距，請確認標記位置")
         return place
     finally:

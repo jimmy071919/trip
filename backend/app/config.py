@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     google_maps_api_key: str | None = None
     google_places_language: str = "zh-TW"
 
+    # Fallback geocoder for links that carry no coordinates (name/address only).
+    # Public Nominatim allows ~1 request/s for user-initiated lookups; set
+    # NOMINATIM_URL to a self-hosted instance for heavier use, or disable.
+    enable_nominatim: bool = True
+    nominatim_url: str = "https://nominatim.openstreetmap.org"
+    nominatim_email: str | None = None
+
     @model_validator(mode="before")
     @classmethod
     def _empty_means_default(cls, data):
