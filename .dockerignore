@@ -1,0 +1,9 @@
+**/node_modules
+**/.venv
+**/__pycache__
+**/dist
+**/*.db
+.env
+.git
+tests/e2e/test-results
+tests/e2e/playwright-report

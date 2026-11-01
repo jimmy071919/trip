@@ -1,0 +1,12 @@
+.env
+*.db
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+node_modules/
+dist/
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+backups/
+*.tsbuildinfo
